@@ -1,157 +1,215 @@
-import React, { useState } from "react";
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
+import React, { useState, useEffect } from 'react';
+import { generateEdiXml, VersementData } from '../lib/xml-generator';
+import { FileCheck, AlertCircle, Download } from 'lucide-react';
+import JSZip from 'jszip';
 
-interface RowData {
-  anneeNumDossier: string;
-  numDossier: string;
-  codeNumDossier: string;
-  dateEnregistrement: string;
-  dateEncaissement: string;
-  referencePaiement: string;
-  refNatureAffaireJuridique: string;
-  refTribunal: string;
+interface XmlGeneratorProps {
+  excelData: any[];
 }
 
-const ExcelToXMLConverter: React.FC = () => {
-  const [excelData, setExcelData] = useState<RowData[]>([]);
+interface FiscalInfo {
+  identifiantFiscal: string;
+  exerciceFiscalDu: string;
+  exerciceFiscalAu: string;
+  anneeVersement: number;
+}
 
-  // Fonction pour reformater les dates
-  const formatDate = (input: any): string => {
-    if (!input) return "";
-    const date = new Date(input);
-    if (isNaN(date.getTime())) return ""; // Si la date est invalide
-    return date.toISOString().split("T")[0];
-  };
+// Fonction pour extraire l'année d'une date
+function extractYear(dateStr: string | number): number {
+  if (!dateStr) return new Date().getFullYear();
 
-  // Gestion de l'importation du fichier Excel
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+  const date = String(dateStr);
 
-        // Reformater les dates dans les données
-        const formattedData = jsonData.map((row: any) => ({
-          anneeNumDossier: row["Année"] || "",
-          numDossier: row["N° Dossier"] || "",
-          codeNumDossier: row["Code"] || "",
-          dateEnregistrement: formatDate(row["Date Enreg."]),
-          dateEncaissement: formatDate(row["Date Encais."]),
-          referencePaiement: row["Référence"] || "",
-          refNatureAffaireJuridique: row["Nature"] || "",
-          refTribunal: row["Tribunal"] || "",
-        }));
+  // Format AAAA-MM-JJ
+  const isoMatch = date.match(/^\d{4}-\d{2}-\d{2}/);
+  if (isoMatch) {
+    return parseInt(date.split('-')[0]);
+  }
 
-        setExcelData(formattedData);
+  // Format JJ/MM/AAAA
+  const frMatch = date.match(/^\d{2}\/\d{2}\/\d{4}$/);
+  if (frMatch) {
+    return parseInt(date.split('/')[2]);
+  }
+
+  // Si c'est déjà une année
+  if (/^\d{4}$/.test(date)) {
+    return parseInt(date);
+  }
+
+  return new Date().getFullYear();
+}
+
+export function XmlGenerator({ excelData }: XmlGeneratorProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const [fiscalInfo, setFiscalInfo] = useState<FiscalInfo>(() => {
+    if (Array.isArray(excelData) && excelData.length > 0) {
+      const firstRecord = excelData[0];
+      const year = extractYear(
+        firstRecord.date_enregistrement || firstRecord.dateEnregistrement || new Date().getFullYear()
+      );
+
+      return {
+        identifiantFiscal: '',
+        exerciceFiscalDu: `${year}-01-01`,
+        exerciceFiscalAu: `${year}-12-31`,
+        anneeVersement: year,
       };
-      reader.readAsArrayBuffer(file);
+    }
+
+    const currentYear = new Date().getFullYear();
+    return {
+      identifiantFiscal: '',
+      exerciceFiscalDu: `${currentYear}-01-01`,
+      exerciceFiscalAu: `${currentYear}-12-31`,
+      anneeVersement: currentYear,
+    };
+  });
+
+  useEffect(() => {
+    if (Array.isArray(excelData) && excelData.length > 0) {
+      const dates = excelData
+        .map(row => row.date_enregistrement || row.dateEnregistrement)
+        .filter(Boolean)
+        .sort();
+
+      if (dates.length > 0) {
+        const firstDate = dates[0];
+        const lastDate = dates[dates.length - 1];
+        const year = extractYear(firstDate);
+
+        setFiscalInfo(prev => ({
+          ...prev,
+          exerciceFiscalDu: firstDate,
+          exerciceFiscalAu: lastDate,
+          anneeVersement: year,
+        }));
+      }
+    }
+  }, [excelData]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+
+    if (name === 'anneeVersement') {
+      setFiscalInfo(prev => ({
+        ...prev,
+        [name]: parseInt(value) || prev.anneeVersement,
+      }));
+    } else {
+      setFiscalInfo(prev => ({
+        ...prev,
+        [name]: value,
+      }));
     }
   };
 
-  // Génération du fichier XML
-  const generateXML = () => {
-    let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n<Affaires>\n';
-    excelData.forEach((row) => {
-      xmlContent += `  <Affaire>\n`;
-      xmlContent += `    <Annee>${row.anneeNumDossier}</Annee>\n`;
-      xmlContent += `    <NumDossier>${row.numDossier}</NumDossier>\n`;
-      xmlContent += `    <Code>${row.codeNumDossier}</Code>\n`;
-      xmlContent += `    <DateEnregistrement>${row.dateEnregistrement}</DateEnregistrement>\n`;
-      xmlContent += `    <DateEncaissement>${row.dateEncaissement}</DateEncaissement>\n`;
-      xmlContent += `    <Reference>${row.referencePaiement}</Reference>\n`;
-      xmlContent += `    <Nature>${row.refNatureAffaireJuridique}</Nature>\n`;
-      xmlContent += `    <Tribunal>${row.refTribunal}</Tribunal>\n`;
-      xmlContent += `  </Affaire>\n`;
-    });
-    xmlContent += `</Affaires>`;
+  const handleGenerate = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setSuccess(false);
 
-    // Enregistrer le fichier XML
-    const blob = new Blob([xmlContent], { type: "application/xml" });
-    saveAs(blob, "AffairesJuridiques.xml");
+      if (!Array.isArray(excelData) || excelData.length === 0) {
+        throw new Error('Aucune donnée à générer');
+      }
+
+      const versementData: VersementData = {
+        identifiantFiscal: fiscalInfo.identifiantFiscal.trim(),
+        exerciceFiscalDu: fiscalInfo.exerciceFiscalDu,
+        exerciceFiscalAu: fiscalInfo.exerciceFiscalAu,
+        anneeVersement: fiscalInfo.anneeVersement,
+        affairesJuridiques: excelData.map(row => ({
+          anneeNumDossier: row.annee_num_dossier || row.anneeNumDossier,
+          numDossier: row.num_dossier || row.numDossier,
+          codeNumDossier: row.code_num_dossier || row.codeNumDossier,
+          dateEnregistrement: row.date_enregistrement || row.dateEnregistrement,
+          dateEncaissement: row.date_encaissement || row.dateEncaissement,
+          referencePaiement: row.reference_paiement || row.referencePaiement,
+          refNatureAffaireJuridique: row.ref_nature_affaire_juridique || row.refNatureAffaireJuridique,
+          refTribunal: row.ref_tribunal || row.refTribunal,
+        })),
+      };
+
+      const { content: xmlContent, filename: xmlFilename } = generateEdiXml(versementData);
+
+      const zip = new JSZip();
+      zip.file(xmlFilename, xmlContent);
+
+      const zipContent = await zip.generateAsync({ type: 'blob' });
+
+      const zipFilename = xmlFilename.replace('.xml', '.zip');
+      const url = window.URL.createObjectURL(zipContent);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = zipFilename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la génération du fichier');
+      console.error('Erreur:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Importer et Générer un XML</h1>
-
-      {/* Importation du fichier Excel */}
-      <div className="mb-4">
-        <input
-          type="file"
-          accept=".xlsx, .xls"
-          onChange={handleFileUpload}
-          className="border p-2"
-        />
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <h3 className="text-lg font-semibold mb-4">Informations de versement</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="identifiantFiscal" className="block text-sm font-medium text-gray-700 mb-1">
+              Identifiant Fiscal *
+            </label>
+            <input
+              id="identifiantFiscal"
+              type="text"
+              name="identifiantFiscal"
+              value={fiscalInfo.identifiantFiscal}
+              onChange={handleInputChange}
+              pattern="\d+"
+              placeholder="Ex: 123456789"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="anneeVersement" className="block text-sm font-medium text-gray-700 mb-1">
+              Année de versement
+            </label>
+            <input
+              id="anneeVersement"
+              type="number"
+              name="anneeVersement"
+              value={fiscalInfo.anneeVersement}
+              onChange={handleInputChange}
+              min="2020"
+              max={new Date().getFullYear() + 1}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Tableau des données */}
-      {excelData.length > 0 && (
-        <div>
-          <h2 className="text-xl font-semibold mb-2">Aperçu des Données</h2>
-          <table className="table-auto w-full border-collapse border border-gray-300">
-            <thead>
-              <tr className="bg-gray-200">
-                <th className="border border-gray-300 px-4 py-2">Année</th>
-                <th className="border border-gray-300 px-4 py-2">N° Dossier</th>
-                <th className="border border-gray-300 px-4 py-2">Code</th>
-                <th className="border border-gray-300 px-4 py-2">Date Enreg.</th>
-                <th className="border border-gray-300 px-4 py-2">Date Encais.</th>
-                <th className="border border-gray-300 px-4 py-2">Référence</th>
-                <th className="border border-gray-300 px-4 py-2">Nature</th>
-                <th className="border border-gray-300 px-4 py-2">Tribunal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {excelData.map((row, index) => (
-                <tr key={index}>
-                  <td className="border border-gray-300 px-4 py-2">
-                    {row.anneeNumDossier}
-                  </td>
-                  <td className="border border-gray-300 px-4 py-2">
-                    {row.numDossier}
-                  </td>
-                  <td className="border border-gray-300 px-4 py-2">
-                    {row.codeNumDossier}
-                  </td>
-                  <td className="border border-gray-300 px-4 py-2">
-                    {row.dateEnregistrement}
-                  </td>
-                  <td className="border border-gray-300 px-4 py-2">
-                    {row.dateEncaissement}
-                  </td>
-                  <td className="border border-gray-300 px-4 py-2">
-                    {row.referencePaiement}
-                  </td>
-                  <td className="border border-gray-300 px-4 py-2">
-                    {row.refNatureAffaireJuridique}
-                  </td>
-                  <td className="border border-gray-300 px-4 py-2">
-                    {row.refTribunal}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="flex justify-end gap-4">
+          <button
+            onClick={handleGenerate}
+            disabled={loading || !fiscalInfo.identifiantFiscal}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+          >
+            {loading ? 'Génération en cours...' : 'Générer EDI'}
+          </button>
         </div>
-      )}
-
-      {/* Bouton pour générer le fichier XML */}
-      <div className="mt-4">
-        <button
-          onClick={generateXML}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Générer XML
-        </button>
       </div>
     </div>
   );
-};
-
-export default ExcelToXMLConverter;
+}
