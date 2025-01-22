@@ -14,25 +14,20 @@ interface FiscalInfo {
   anneeVersement: number;
 }
 
-// Fonction pour extraire l'année d'une date
 function extractYear(dateStr: string | number): number {
   if (!dateStr) return new Date().getFullYear();
 
   const date = String(dateStr);
-
-  // Format AAAA-MM-JJ
-  const isoMatch = date.match(/^\d{4}-\d{2}-\d{2}/);
+  const isoMatch = date.match(/^\d{4}/);
   if (isoMatch) {
-    return parseInt(date.split('-')[0]);
+    return parseInt(isoMatch[0]);
   }
 
-  // Format JJ/MM/AAAA
-  const frMatch = date.match(/^\d{2}\/\d{2}\/\d{4}$/);
+  const frMatch = date.match(/\d{2}\/\d{2}\/\d{4}$/);
   if (frMatch) {
-    return parseInt(date.split('/')[2]);
+    return parseInt(frMatch[0].slice(-4));
   }
 
-  // Si c'est déjà une année
   if (/^\d{4}$/.test(date)) {
     return parseInt(date);
   }
@@ -48,15 +43,13 @@ export function XmlGenerator({ excelData }: XmlGeneratorProps) {
   const [fiscalInfo, setFiscalInfo] = useState<FiscalInfo>(() => {
     if (Array.isArray(excelData) && excelData.length > 0) {
       const firstRecord = excelData[0];
-      const year = extractYear(
-        firstRecord.date_enregistrement || firstRecord.dateEnregistrement || new Date().getFullYear()
-      );
+      const year = extractYear(firstRecord.date_enregistrement || firstRecord.dateEnregistrement || new Date().getFullYear());
 
       return {
         identifiantFiscal: '',
         exerciceFiscalDu: `${year}-01-01`,
         exerciceFiscalAu: `${year}-12-31`,
-        anneeVersement: year,
+        anneeVersement: year
       };
     }
 
@@ -65,7 +58,7 @@ export function XmlGenerator({ excelData }: XmlGeneratorProps) {
       identifiantFiscal: '',
       exerciceFiscalDu: `${currentYear}-01-01`,
       exerciceFiscalAu: `${currentYear}-12-31`,
-      anneeVersement: currentYear,
+      anneeVersement: currentYear
     };
   });
 
@@ -85,7 +78,7 @@ export function XmlGenerator({ excelData }: XmlGeneratorProps) {
           ...prev,
           exerciceFiscalDu: firstDate,
           exerciceFiscalAu: lastDate,
-          anneeVersement: year,
+          anneeVersement: year
         }));
       }
     }
@@ -97,12 +90,12 @@ export function XmlGenerator({ excelData }: XmlGeneratorProps) {
     if (name === 'anneeVersement') {
       setFiscalInfo(prev => ({
         ...prev,
-        [name]: parseInt(value) || prev.anneeVersement,
+        [name]: parseInt(value) || prev.anneeVersement
       }));
     } else {
       setFiscalInfo(prev => ({
         ...prev,
-        [name]: value,
+        [name]: value
       }));
     }
   };
@@ -130,8 +123,8 @@ export function XmlGenerator({ excelData }: XmlGeneratorProps) {
           dateEncaissement: row.date_encaissement || row.dateEncaissement,
           referencePaiement: row.reference_paiement || row.referencePaiement,
           refNatureAffaireJuridique: row.ref_nature_affaire_juridique || row.refNatureAffaireJuridique,
-          refTribunal: row.ref_tribunal || row.refTribunal,
-        })),
+          refTribunal: row.ref_tribunal || row.refTribunal
+        }))
       };
 
       const { content: xmlContent, filename: xmlFilename } = generateEdiXml(versementData);
@@ -177,7 +170,7 @@ export function XmlGenerator({ excelData }: XmlGeneratorProps) {
               onChange={handleInputChange}
               pattern="\d+"
               placeholder="Ex: 123456789"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
               required
             />
           </div>
@@ -193,22 +186,19 @@ export function XmlGenerator({ excelData }: XmlGeneratorProps) {
               onChange={handleInputChange}
               min="2020"
               max={new Date().getFullYear() + 1}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
             />
           </div>
         </div>
       </div>
-
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex justify-end gap-4">
-          <button
-            onClick={handleGenerate}
-            disabled={loading || !fiscalInfo.identifiantFiscal}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
-          >
-            {loading ? 'Génération en cours...' : 'Générer EDI'}
-          </button>
-        </div>
+      <div className="flex justify-end gap-4">
+        <button
+          onClick={handleGenerate}
+          disabled={loading || !fiscalInfo.identifiantFiscal}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg"
+        >
+          {loading ? 'Génération en cours...' : 'Générer EDI'}
+        </button>
       </div>
     </div>
   );
