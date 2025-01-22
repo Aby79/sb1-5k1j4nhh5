@@ -61,7 +61,7 @@ export function XmlGenerator({ excelData }: XmlGeneratorProps) {
     if (Array.isArray(excelData) && excelData.length > 0) {
       // Trouver la première et la dernière date d'enregistrement
       const dates = excelData
-        .map(row => row.date_enregistrement || row.dateEnregistrement)
+        .map(row => row.dateEnregistrement)
         .filter(Boolean)
         .sort();
 
@@ -113,14 +113,14 @@ export function XmlGenerator({ excelData }: XmlGeneratorProps) {
         exerciceFiscalAu: fiscalInfo.exerciceFiscalAu,
         anneeVersement: fiscalInfo.anneeVersement,
         affairesJuridiques: excelData.map(row => ({
-          anneeNumDossier: row.annee_num_dossier || row.anneeNumDossier,
-          numDossier: row.num_dossier || row.numDossier,
-          codeNumDossier: row.code_num_dossier || row.codeNumDossier,
-          dateEnregistrement: row.date_enregistrement || row.dateEnregistrement,
-          dateEncaissement: row.date_encaissement || row.dateEncaissement,
-          referencePaiement: row.reference_paiement || row.referencePaiement,
-          refNatureAffaireJuridique: row.ref_nature_affaire_juridique || row.refNatureAffaireJuridique,
-          refTribunal: row.ref_tribunal || row.refTribunal
+          anneeNumDossier: row.anneeNumDossier,
+          numDossier: row.numDossier,
+          codeNumDossier: row.codeNumDossier,
+          dateEnregistrement: row.dateEnregistrement,
+          dateEncaissement: row.dateEncaissement,
+          referencePaiement: row.referencePaiement,
+          refNatureAffaireJuridique: row.refNatureAffaireJuridique,
+          refTribunal: row.refTribunal
         }))
       };
 
@@ -270,28 +270,28 @@ export function XmlGenerator({ excelData }: XmlGeneratorProps) {
               {excelData.map((row, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="px-4 py-2 text-sm text-gray-900">
-                    {row.annee_num_dossier || row.anneeNumDossier}
+                    {row.anneeNumDossier}
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-900">
-                    {row.num_dossier || row.numDossier}
+                    {row.numDossier}
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-900">
-                    {row.code_num_dossier || row.codeNumDossier}
+                    {row.codeNumDossier}
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-900">
-                    {row.date_enregistrement || row.dateEnregistrement}
+                    {row.dateEnregistrement}
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-900">
-                    {row.date_encaissement || row.dateEncaissement}
+                    {row.dateEncaissement}
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-900">
-                    {row.reference_paiement || row.referencePaiement}
+                    {row.referencePaiement}
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-900">
-                    {row.ref_nature_affaire_juridique || row.refNatureAffaireJuridique}
+                    {row.refNatureAffaireJuridique}
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-900">
-                    {row.ref_tribunal || row.refTribunal}
+                    {row.refTribunal}
                   </td>
                 </tr>
               ))}
