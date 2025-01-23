@@ -2,12 +2,33 @@ import React, { useState } from 'react';
 import JSZip from 'jszip';
 import { create } from 'xmlbuilder2';
 
-export function XmlGenerator({ excelData }) {
+interface ExcelRow {
+  anneeNumDossier: number;
+  numDossier: number;
+  codeNumDossier: number;
+  dateEnregistrement: string;
+  dateEncaissement: string;
+  referencePaiement: string;
+  refNatureAffaireJuridique: string;
+  refTribunal: string;
+}
+
+interface XmlGeneratorProps {
+  excelData: ExcelRow[];
+}
+
+export function XmlGenerator({ excelData }: XmlGeneratorProps): JSX.Element {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const generateXML = (data) => {
+  const generateXML = (data: {
+    identifiantFiscal: string;
+    exerciceFiscalDu: string;
+    exerciceFiscalAu: string;
+    anneeVersement: number;
+    affaires: ExcelRow[];
+  }): string => {
     const root = create({ version: '1.0', encoding: 'UTF-8' })
       .ele('VersementAvocatsRAF', {
         'xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance',
@@ -25,9 +46,9 @@ export function XmlGenerator({ excelData }) {
     data.affaires.forEach(affaire => {
       const detail = listDetail.ele('DetailAffaireJuridiqueRAF');
       detail
-        .ele('anneeNumDossier').txt(affaire.anneeNumDossier).up()
-        .ele('numDossier').txt(affaire.numDossier).up()
-        .ele('codeNumDossier').txt(affaire.codeNumDossier).up()
+        .ele('anneeNumDossier').txt(affaire.anneeNumDossier.toString()).up()
+        .ele('numDossier').txt(affaire.numDossier.toString()).up()
+        .ele('codeNumDossier').txt(affaire.codeNumDossier.toString()).up()
         .ele('dateEnregistrement').txt(affaire.dateEnregistrement).up()
         .ele('dateEncaissement').txt(affaire.dateEncaissement).up()
         .ele('referencePaiement').txt(affaire.referencePaiement).up()
@@ -42,7 +63,7 @@ export function XmlGenerator({ excelData }) {
     return root.end({ prettyPrint: true });
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
@@ -58,16 +79,7 @@ export function XmlGenerator({ excelData }) {
         exerciceFiscalDu: '2024-01-01',
         exerciceFiscalAu: '2024-12-31',
         anneeVersement: 2024,
-        affaires: excelData.map(row => ({
-          anneeNumDossier: row.anneeNumDossier,
-          numDossier: row.numDossier,
-          codeNumDossier: row.codeNumDossier,
-          dateEnregistrement: row.dateEnregistrement,
-          dateEncaissement: row.dateEncaissement,
-          referencePaiement: row.referencePaiement,
-          refNatureAffaireJuridique: row.refNatureAffaireJuridique,
-          refTribunal: row.refTribunal,
-        }))
+        affaires: excelData,
       };
 
       const xmlContent = generateXML(data);
@@ -92,7 +104,7 @@ export function XmlGenerator({ excelData }) {
 
       setSuccess(true);
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
