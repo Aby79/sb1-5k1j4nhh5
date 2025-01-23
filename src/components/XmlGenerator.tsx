@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import JSZip from 'jszip';
 import { create } from 'xmlbuilder2';
+import * as XLSX from 'xlsx';
 
 interface ExcelRow {
   anneeNumDossier: number;
@@ -13,14 +14,37 @@ interface ExcelRow {
   refTribunal: string;
 }
 
-interface XmlGeneratorProps {
-  excelData: ExcelRow[];
-}
-
-export function XmlGenerator({ excelData }: XmlGeneratorProps): JSX.Element {
+export function XmlGeneratorApp(): JSX.Element {
+  const [excelData, setExcelData] = useState<ExcelRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        const mappedData = jsonData.map((row: any) => ({
+          anneeNumDossier: row['Année'] || 0,
+          numDossier: row['Numéro de Dossier'] || 0,
+          codeNumDossier: row['Code Dossier'] || 0,
+          dateEnregistrement: row['Date Enregistrement'] || '',
+          dateEncaissement: row['Date Encaissement'] || '',
+          referencePaiement: row['Référence Paiement'] || '',
+          refNatureAffaireJuridique: row['Nature Affaire'] || '',
+          refTribunal: row['Tribunal'] || '',
+        }));
+        setExcelData(mappedData as ExcelRow[]);
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  };
 
   const generateXML = (data: {
     identifiantFiscal: string;
@@ -112,6 +136,20 @@ export function XmlGenerator({ excelData }: XmlGeneratorProps): JSX.Element {
 
   return (
     <div className="space-y-6">
+      <h2 className="text-xl font-bold">Portail des Avocats</h2>
+
+      <div className="space-y-4">
+        <label className="block">
+          <span className="text-gray-700">Importer un fichier Excel :</span>
+          <input
+            type="file"
+            accept=".xlsx, .xls"
+            onChange={handleFileUpload}
+            className="mt-2 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+          />
+        </label>
+      </div>
+
       {error && <div className="text-red-600">Erreur: {error}</div>}
       {success && <div className="text-green-600">Fichier XML généré avec succès.</div>}
 
