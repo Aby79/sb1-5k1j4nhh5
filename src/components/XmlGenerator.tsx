@@ -7,6 +7,41 @@ export function XmlGenerator({ excelData }) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
+  const generateXML = (data) => {
+    const root = create({ version: '1.0', encoding: 'UTF-8' })
+      .ele('VersementAvocatsRAF', {
+        'xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance',
+        'xsi:noNamespaceSchemaLocation': 'VersementAvocatsRAF.xsd'
+      });
+
+    root
+      .ele('identifiantFiscal').txt(data.identifiantFiscal).up()
+      .ele('exerciceFiscalDu').txt(data.exerciceFiscalDu).up()
+      .ele('exerciceFiscalAu').txt(data.exerciceFiscalAu).up()
+      .ele('anneeVersement').txt(data.anneeVersement.toString()).up();
+
+    const listDetail = root.ele('listDetailAffaireJuridique');
+
+    data.affaires.forEach(affaire => {
+      const detail = listDetail.ele('DetailAffaireJuridiqueRAF');
+      detail
+        .ele('anneeNumDossier').txt(affaire.anneeNumDossier).up()
+        .ele('numDossier').txt(affaire.numDossier).up()
+        .ele('codeNumDossier').txt(affaire.codeNumDossier).up()
+        .ele('dateEnregistrement').txt(affaire.dateEnregistrement).up()
+        .ele('dateEncaissement').txt(affaire.dateEncaissement).up()
+        .ele('referencePaiement').txt(affaire.referencePaiement).up()
+        .ele('refNatureAffaireJuridique')
+          .ele('code').txt(affaire.refNatureAffaireJuridique).up()
+        .up()
+        .ele('refTribunal')
+          .ele('code').txt(affaire.refTribunal).up()
+        .up();
+    });
+
+    return root.end({ prettyPrint: true });
+  };
+
   const handleGenerate = async () => {
     try {
       setLoading(true);
@@ -17,46 +52,25 @@ export function XmlGenerator({ excelData }) {
         throw new Error('Aucune donnée disponible pour générer le fichier XML.');
       }
 
-      // Préparer les données XML
-      const root = create({ version: '1.0', encoding: 'UTF-8' })
-        .ele('VersementAvocatsRAF', {
-          'xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance',
-          'xsi:noNamespaceSchemaLocation': 'VersementAvocatsRAF.xsd'
-        });
-
-      const fiscalInfo = {
+      // Préparer les données pour la génération du XML
+      const data = {
         identifiantFiscal: '123456789', // Remplacez par la vraie valeur si nécessaire
         exerciceFiscalDu: '2024-01-01',
         exerciceFiscalAu: '2024-12-31',
         anneeVersement: 2024,
+        affaires: excelData.map(row => ({
+          anneeNumDossier: row.anneeNumDossier,
+          numDossier: row.numDossier,
+          codeNumDossier: row.codeNumDossier,
+          dateEnregistrement: row.dateEnregistrement,
+          dateEncaissement: row.dateEncaissement,
+          referencePaiement: row.referencePaiement,
+          refNatureAffaireJuridique: row.refNatureAffaireJuridique,
+          refTribunal: row.refTribunal,
+        }))
       };
 
-      root
-        .ele('identifiantFiscal').txt(fiscalInfo.identifiantFiscal).up()
-        .ele('exerciceFiscalDu').txt(fiscalInfo.exerciceFiscalDu).up()
-        .ele('exerciceFiscalAu').txt(fiscalInfo.exerciceFiscalAu).up()
-        .ele('anneeVersement').txt(fiscalInfo.anneeVersement.toString()).up();
-
-      const listDetail = root.ele('listDetailAffaireJuridique');
-
-      excelData.forEach(row => {
-        const detail = listDetail.ele('DetailAffaireJuridiqueRAF');
-        detail
-          .ele('anneeNumDossier').txt(row.anneeNumDossier).up()
-          .ele('numDossier').txt(row.numDossier).up()
-          .ele('codeNumDossier').txt(row.codeNumDossier).up()
-          .ele('dateEnregistrement').txt(row.dateEnregistrement).up()
-          .ele('dateEncaissement').txt(row.dateEncaissement).up()
-          .ele('referencePaiement').txt(row.referencePaiement).up()
-          .ele('refNatureAffaireJuridique')
-            .ele('code').txt(row.refNatureAffaireJuridique).up()
-          .up()
-          .ele('refTribunal')
-            .ele('code').txt(row.refTribunal).up()
-          .up();
-      });
-
-      const xmlContent = root.end({ prettyPrint: true });
+      const xmlContent = generateXML(data);
 
       // Créer un fichier ZIP
       const zip = new JSZip();
@@ -88,6 +102,41 @@ export function XmlGenerator({ excelData }) {
     <div className="space-y-6">
       {error && <div className="text-red-600">Erreur: {error}</div>}
       {success && <div className="text-green-600">Fichier XML généré avec succès.</div>}
+
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <h3 className="text-lg font-semibold mb-4">Aperçu des données Excel</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Année</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Numéro de Dossier</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Code Dossier</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date Enregistrement</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date Encaissement</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Référence Paiement</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nature Affaire</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tribunal</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {excelData.map((row, index) => (
+                <tr key={index}>
+                  <td className="px-4 py-2 text-sm text-gray-900">{row.anneeNumDossier}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900">{row.numDossier}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900">{row.codeNumDossier}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900">{row.dateEnregistrement}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900">{row.dateEncaissement}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900">{row.referencePaiement}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900">{row.refNatureAffaireJuridique}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900">{row.refTribunal}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <button
         onClick={handleGenerate}
         disabled={loading}
