@@ -33,9 +33,9 @@ export function XmlGeneratorApp(): JSX.Element {
           const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
           // Validation et mappage des données
-          const mappedData = jsonData.map((row: any) => {
+          const mappedData = jsonData.map((row: any, index: number) => {
             if (!row['Année'] || !row['Numéro de Dossier'] || !row['Code Dossier']) {
-              throw new Error('Le fichier Excel est mal formaté ou contient des données manquantes.');
+              throw new Error(`Données manquantes dans la ligne ${index + 1}`);
             }
             return {
               anneeNumDossier: row['Année'],
