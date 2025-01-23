@@ -25,24 +25,39 @@ export function XmlGeneratorApp(): JSX.Element {
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        const mappedData = jsonData.map((row: any) => ({
-          anneeNumDossier: row['Année'] || 0,
-          numDossier: row['Numéro de Dossier'] || 0,
-          codeNumDossier: row['Code Dossier'] || 0,
-          dateEnregistrement: row['Date Enregistrement'] || '',
-          dateEncaissement: row['Date Encaissement'] || '',
-          referencePaiement: row['Référence Paiement'] || '',
-          refNatureAffaireJuridique: row['Nature Affaire'] || '',
-          refTribunal: row['Tribunal'] || '',
-        }));
-        setExcelData(mappedData as ExcelRow[]);
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+          // Validation et mappage des données
+          const mappedData = jsonData.map((row: any) => {
+            if (!row['Année'] || !row['Numéro de Dossier'] || !row['Code Dossier']) {
+              throw new Error('Le fichier Excel est mal formaté ou contient des données manquantes.');
+            }
+            return {
+              anneeNumDossier: row['Année'],
+              numDossier: row['Numéro de Dossier'],
+              codeNumDossier: row['Code Dossier'],
+              dateEnregistrement: row['Date Enregistrement'] || '',
+              dateEncaissement: row['Date Encaissement'] || '',
+              referencePaiement: row['Référence Paiement'] || '',
+              refNatureAffaireJuridique: row['Nature Affaire'] || '',
+              refTribunal: row['Tribunal'] || '',
+            };
+          });
+
+          setExcelData(mappedData as ExcelRow[]);
+          setError(null);
+        } catch (err) {
+          setError('Erreur lors du traitement du fichier Excel : ' + (err as Error).message);
+        }
       };
       reader.readAsArrayBuffer(file);
+    } else {
+      setError('Aucun fichier sélectionné.');
     }
   };
 
